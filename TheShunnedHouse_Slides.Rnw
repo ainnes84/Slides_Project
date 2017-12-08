@@ -1,0 +1,155 @@
+\documentclass{beamer}
+\usecolortheme{albatross}
+
+\begin{document}
+
+\title{Comparison Barplots with The Shunned House}
+\author{Andrew Innes}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}
+  \frametitle{Outline}
+    \tableofcontents
+\end{frame}
+
+\section{Install and Load Libraries}
+\begin{frame}[fragile]
+  \frametitle{Install and Load Libraries}
+    \begin{itemize}
+      \item<1->
+<<warning=FALSE,message=FALSE>>=
+library(dplyr)
+@
+      \item<2->
+<<warning=FALSE,message=FALSE>>=
+library(tidytext)
+@
+      \item<3->
+<<warning=FALSE,message=FALSE>>=
+library(gutenbergr)
+@
+      \item<4->
+<<warning=FALSE,message=FALSE>>=
+library(ggplot2)
+@
+      \item<5->
+<<warning=FALSE,message=FALSE>>=
+library(stringr)
+@
+    \end{itemize}
+\end{frame}
+      
+\section{Access Project Gutenberg}
+\begin{frame}[fragile]
+  \frametitle{Access Project Gutenberg}
+<<warning=FALSE,message=FALSE>>=
+df<-gutenberg_works(str_detect(title,
+                               'The Shunned House'))
+df$gutenberg_id
+df$title
+@
+\end{frame}
+
+\section{Download The Shunned House}
+\begin{frame}[fragile]
+  \frametitle{Download The Shunned House}
+<<warning=FALSE,message=FALSE>>=
+House<-gutenberg_download(31469)
+colnames(House)
+substr(House$text[400],1,21)
+@
+\end{frame}
+
+\section{Unpack the Words}
+\begin{frame}[fragile]
+  \frametitle{Unpack the Words}
+<<warning=FALSE,message=FALSE>>=
+shunned_words<-House%>%
+  unnest_tokens(word,text)
+colnames(shunned_words)
+shunned_words[398:400,]
+@
+\end{frame}
+
+\section{The Bing Lexicon}
+\begin{frame}[fragile]
+  \frametitle{The Bing Lexicon}
+<<>>=
+bing<-get_sentiments('bing')
+colnames(bing)
+bing[398:400,]
+@
+\end{frame}
+
+\section{The Inner Join}
+\begin{frame}[fragile]
+  \frametitle{The Inner Join}
+<<warning=FALSE,message=FALSE>>=
+shunned_words<-inner_join(shunned_words,bing)
+shunned_words$gutenberg_id<-NULL
+shunned_words[398:400,]
+@
+\end{frame}
+
+\section{Top Ten Positive Words}
+\begin{frame}[allowframebreaks,fragile]
+  \frametitle{Top Ten Positive Words}
+<<>>=
+shunned_pos<-shunned_words%>%
+  filter(sentiment=='positive')%>%
+  group_by(word)%>%
+  summarize(count=n(),sentiment=first(sentiment))%>%
+  arrange(count)%>%
+  top_n(10,wt=count)
+@
+\framebreak
+<<>>=
+shunned_pos
+@
+\end{frame}
+
+\section{Top Ten Negative Words}
+\begin{frame}[allowframebreaks,fragile]
+  \frametitle{Top Ten Negative Words}
+<<>>=
+shunned_neg<-shunned_words%>%
+  filter(sentiment=='negative')%>%
+  group_by(word)%>%
+  summarize(count=n(),sentiment=first(sentiment))%>%
+  arrange(count)%>%
+  filter(word!='miss')%>%
+  top_n(10,wt=count)
+@
+\framebreak
+<<>>=
+shunned_neg
+@
+\end{frame}
+
+\section{The Comparison Bar Plot}
+\begin{frame}[allowframebreaks,fragile]
+  \frametitle{The Comparison Bar Plot}
+<<>>=
+shunned_pos$word<-factor(shunned_pos$word,
+                         levels=shunned_pos$word)
+shunned_neg$word<-factor(shunned_neg$word,
+                         levels=shunned_neg$word)
+shunned_comp<-rbind(shunned_pos,shunned_neg)
+plot<-ggplot()+
+  geom_bar(data=shunned_comp,
+           aes(x=word,y=count, fill=sentiment, 
+               color=sentiment),stat='identity')+
+  coord_flip()+
+  facet_wrap(~sentiment,scales='free_y')+
+  scale_fill_manual(values=c('black','#ea6205'))+
+  scale_color_manual(values=c('#ea6205','black'))
+@
+\framebreak
+<<echo=FALSE,fig.height=5>>=
+plot
+@
+\end{frame}
+\end{document}
